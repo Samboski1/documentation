@@ -24,36 +24,61 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Git User
         run: |
           git config --global user.email "npm-cli+bot@github.com"
           git config --global user.name "npm CLI robot"
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
+        id: node
         with:
-          node-version: 18.x
+          node-version: 22.x
+          check-latest: contains('22.x', '.x')
           cache: npm
-      - name: Install npm@latest
-        run: npm i --prefer-online --no-fund --no-audit -g npm@latest
-      - name: npm Version
-        run: npm -v
+      - name: Install Latest npm
+        uses: ./.github/actions/install-latest-npm
+        with:
+          node: ${{ steps.node.outputs.node-version }}
       - name: Install Dependencies
         run: npm i --no-audit --no-fund
+      - name: Rebuild deps
+        run: npm rebuild
+
       - name: Setup Pages
-        uses: actions/configure-pages@v1
+        uses: actions/configure-pages@v4
+
+      - name: Restore cache
+        id: cache-gatsby
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ runner.os }}-gatsby-${{ github.ref_name }}
+          path: |
+            public
+            .cache
+
       - name: Build documentation
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.cache-gatsby.outputs.cache-primary-key }}
+          path: |
+            public
+            .cache
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: './public'
 
   deploy:
     permissions:
       pages: write
+      actions: read
       id-token: write
     environment:
       name: github-pages
@@ -63,6 +88,6 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4
         with:
           preview: ${{ github.event_name == 'pull_request' }}
